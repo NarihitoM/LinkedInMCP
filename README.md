@@ -1,4 +1,8 @@
-# LinkedIn MCP
+<p align="center">
+  <img src="public/linkedin-logo.svg" width="96" height="96" alt="LinkedIn logo">
+</p>
+
+<h1 align="center">LinkedIn MCP</h1>
 
 A remote MCP server that lets Claude (and other MCP clients) manage a LinkedIn account: edit the profile, publish posts, network, message, and search and apply for jobs.
 
@@ -14,6 +18,8 @@ LinkedIn's official API only lets regular apps sign users in and publish or dele
 | Headless browser (Playwright) logged in as the user | Profile edits, reading posts, comments, reactions, networking, messaging, jobs, companies |
 
 The browser always runs headless on the server, so no window ever opens. To connect it, the user opens a one-time link. The page streams the server's hidden browser to them, and they log in to LinkedIn there (2FA works). The resulting session cookies are encrypted and stored on the server.
+
+LinkedIn is a trademark of LinkedIn Corporation. This project is not affiliated with or endorsed by LinkedIn.
 
 > Browser automation goes against LinkedIn's User Agreement and can get an account restricted. Test with a secondary account first.
 
@@ -136,4 +142,5 @@ src/
   shared/
     lib/                  env, seal, userStore, browserPool, pageActions, pageExtract, logger
     utils/                defineTool, toolResult, errors, cookies, html, linkedinIds, littleText, safeFetch
+public/                   Static assets (logo)
 ```
