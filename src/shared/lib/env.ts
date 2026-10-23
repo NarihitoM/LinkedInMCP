@@ -32,11 +32,23 @@ export type Env = z.infer<typeof envSchema>;
 
 let cached: Env | undefined;
 
+function isLocalUrl(value: string): boolean {
+  try {
+    const { hostname } = new URL(value);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
 export function getEnv(): Env {
   if (cached) return cached;
 
   const present = Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== ""));
-  present.BASE_URL ??= process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined;
+  const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (vercelUrl && (!present.BASE_URL || isLocalUrl(present.BASE_URL))) {
+    present.BASE_URL = `https://${vercelUrl}`;
+  }
   const result = envSchema.safeParse(present);
   if (!result.success) {
     const issues = result.error.issues.map((issue) => `  ${issue.path.join(".")}: ${issue.message}`).join("\n");
