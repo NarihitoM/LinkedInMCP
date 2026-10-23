@@ -6,7 +6,7 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
-export type SealType = "client" | "authorize" | "code" | "access" | "refresh" | "connect" | "user";
+export type SealType = "client" | "authorize" | "code" | "access" | "refresh";
 
 export interface Unsealed<T> {
   data: T;

@@ -5,8 +5,7 @@ import express, { type Express } from "express";
 import { createMcpServer } from "./mcp/server.ts";
 import { authRouter, grantSchema, LinkedInOAuthProvider, MCP_SCOPE } from "./modules/auth/index.ts";
 import { homeRouter, MCP_PATH } from "./modules/home/index.ts";
-import { sessionRouter } from "./modules/session/index.ts";
-import { browserToolsEnabled, getEnv, type Env } from "./shared/lib/env.ts";
+import { getEnv, type Env } from "./shared/lib/env.ts";
 import { errorHandler } from "./shared/middlewares/errorHandler.ts";
 
 function createApp(env: Env): Express {
@@ -31,9 +30,6 @@ function createApp(env: Env): Express {
   );
   app.use(homeRouter);
   app.use(authRouter);
-  if (browserToolsEnabled()) {
-    app.use(sessionRouter);
-  }
 
   const bearerAuth = requireBearerAuth({
     verifier: provider,

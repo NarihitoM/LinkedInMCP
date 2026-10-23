@@ -24,8 +24,6 @@ const envSchema = z.object({
       (value) => decodeKey(value) !== undefined,
       "must be 64 hex characters. Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
     ),
-  DATA_DIR: z.string().default("data"),
-  MAX_BROWSERS: positiveInt(3),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -57,8 +55,4 @@ export function getEnv(): Env {
 
   cached = result.data;
   return cached;
-}
-
-export function browserToolsEnabled(): boolean {
-  return !process.env.VERCEL;
 }

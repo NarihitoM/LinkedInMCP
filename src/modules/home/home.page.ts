@@ -26,53 +26,9 @@ const LINKEDIN_MARK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="c
 
 const SIGN_IN_STEP = "Sign in with LinkedIn in the browser window that opens and select <strong>Allow</strong>.";
 
-const API_TOOLS: ToolGroup[] = [
+const TOOLS: ToolGroup[] = [
   { name: "Account", tools: ["whoami"] },
   { name: "Posts", tools: ["create_post", "delete_post"] },
-];
-
-const BROWSER_TOOLS: ToolGroup[] = [
-  { name: "Session", tools: ["session_status", "connect_session_link", "disconnect_session", "set_browser_proxy"] },
-  {
-    name: "Profile",
-    tools: [
-      "get_my_profile",
-      "update_headline",
-      "update_about",
-      "update_location",
-      "update_contact_info",
-      "add_experience",
-      "update_experience",
-      "delete_experience",
-      "add_education",
-      "update_education",
-      "delete_education",
-      "add_skills",
-      "remove_skill",
-      "update_profile_photo",
-      "update_banner",
-      "set_open_to_work",
-    ],
-  },
-  { name: "Posts", tools: ["list_my_posts", "get_post_stats", "comment_on_post", "react_to_post"] },
-  {
-    name: "Network",
-    tools: [
-      "search_people",
-      "get_profile",
-      "send_connection_request",
-      "list_invitations",
-      "accept_invitation",
-      "ignore_invitation",
-      "withdraw_invitation",
-      "list_connections",
-      "remove_connection",
-      "follow",
-      "unfollow",
-    ],
-  },
-  { name: "Messaging", tools: ["list_conversations", "read_conversation", "send_message"] },
-  { name: "Jobs", tools: ["search_jobs", "get_job", "save_job", "list_saved_jobs", "easy_apply", "get_company", "search_companies"] },
 ];
 
 function icon(path: string, evenOdd = false): string {
@@ -262,23 +218,8 @@ function renderToolGroups(groups: ToolGroup[]): string {
     .join("");
 }
 
-function renderTools(browserEnabled: boolean): string {
-  if (browserEnabled) {
-    return `<div class="tool-card">
-  <div class="tool-card-head"><h3>All tools</h3><span class="badge on">Available on this server</span></div>
-  ${renderToolGroups([...API_TOOLS, ...BROWSER_TOOLS])}
-</div>`;
-  }
-
-  return `<div class="tool-card">
-  <div class="tool-card-head"><h3>Official API</h3><span class="badge on">Available on this server</span></div>
-  ${renderToolGroups(API_TOOLS)}
-</div>
-<div class="tool-card muted-card">
-  <div class="tool-card-head"><h3>Browser tools</h3><span class="badge">Run it yourself</span></div>
-  <p class="tool-note">These drive a private headless browser logged in as you, so they need a server that can run Chrome. Clone the repository and run <code>npm run dev</code> to turn them on.</p>
-  ${renderToolGroups(BROWSER_TOOLS)}
-</div>`;
+function renderTools(): string {
+  return `<div class="tool-card">${renderToolGroups(TOOLS)}</div>`;
 }
 
 const PAGE_STYLES = `
@@ -374,16 +315,9 @@ kbd { font-family: var(--mono); font-size: 0.85em; padding: 1px 6px; border-radi
 .snippet pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 0.86rem; line-height: 1.6; }
 .snippet pre code { padding: 0; border: 0; background: none; font-size: inherit; word-break: normal; }
 .tool-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 24px 28px; display: grid; gap: 18px; }
-.tool-card + .tool-card { margin-top: 20px; }
-.tool-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.tool-card-head h3 { margin: 0; font-size: 1.15rem; }
-.badge { font-size: 0.8rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
-.badge.on { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
-.tool-note { margin: 0; color: var(--muted); max-width: 70ch; }
 .tool-group h4 { margin: 0 0 8px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .tools { display: flex; flex-wrap: wrap; gap: 6px; }
 .tools code { font-size: 0.82rem; }
-.muted-card .tools code { opacity: 0.75; }
 .footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 28px 0 40px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.9rem; }
 .footer a { color: inherit; }
 .footer .author { color: var(--text); font-weight: 600; }
@@ -468,11 +402,10 @@ for (const button of document.querySelectorAll("[data-copy]")) {
 }
 `;
 
-export function renderHomePage(serverUrl: string, browserEnabled: boolean): Page {
+const LEAD = "Publish posts and check your account from Claude, Codex, Cursor and any other MCP client.";
+
+export function renderHomePage(serverUrl: string): Page {
   const list = guides(serverUrl);
-  const reach = browserEnabled
-    ? "Edit your profile, publish posts, grow your network, message people and apply for jobs from Claude, Codex, Cursor and any other MCP client."
-    : "Publish posts and check your account from Claude, Codex, Cursor and any other MCP client.";
 
   return renderPage({
     title: "LinkedIn MCP",
@@ -488,7 +421,7 @@ export function renderHomePage(serverUrl: string, browserEnabled: boolean): Page
   <section class="hero">
     <div>
       <h1>Your LinkedIn, inside your AI tools</h1>
-      <p class="lead">${escapeHtml(reach)}</p>
+      <p class="lead">${LEAD}</p>
       <span class="url-label">Server URL</span>
       <div class="url-box">
         <code id="server-url">${escapeHtml(serverUrl)}</code>
@@ -530,7 +463,7 @@ export function renderHomePage(serverUrl: string, browserEnabled: boolean): Page
   <section class="block" id="tools" aria-labelledby="tools-title">
     <h2 id="tools-title">Tools</h2>
     <p class="block-intro">What your assistant can do once you are connected.</p>
-    ${renderTools(browserEnabled)}
+    ${renderTools()}
   </section>
 </main>
 

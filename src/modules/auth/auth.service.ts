@@ -1,11 +1,12 @@
-import { browserToolsEnabled } from "../../shared/lib/env.ts";
 import { exchangeCode, fetchUserInfo } from "../../shared/lib/linkedinOidc.ts";
-import { seal } from "../../shared/lib/seal.ts";
-import { readUser, saveUser, userIdFor } from "../../shared/lib/userStore.ts";
+import { seal, sha256 } from "../../shared/lib/seal.ts";
 import type { ToolContext } from "../../shared/types/tool.ts";
 import { ToolError } from "../../shared/utils/errors.ts";
-import { createConnectUrl } from "../session/index.ts";
 import { AUTHORIZATION_CODE_TTL, type AuthorizationCode, type Member, type PendingAuthorization } from "./auth.types.ts";
+
+export function userIdFor(sub: string): string {
+  return sha256(`linkedin:${sub}`).slice(0, 32);
+}
 
 export function redirectWith(target: string, params: Record<string, string | undefined>): string {
   const url = new URL(target);
@@ -36,32 +37,10 @@ export async function completeAuthorization(pending: PendingAuthorization, linke
     codeChallenge: pending.codeChallenge,
     redirectUri: pending.redirectUri,
   };
-  const clientRedirect = redirectWith(pending.redirectUri, {
+  return redirectWith(pending.redirectUri, {
     code: seal("code", code, AUTHORIZATION_CODE_TTL),
     state: pending.state,
   });
-
-  if (!browserToolsEnabled()) {
-    return clientRedirect;
-  }
-
-  const existing = await readUser(userId);
-  const now = Date.now();
-  await saveUser({
-    ...existing,
-    id: userId,
-    sub: member.sub,
-    name: member.name,
-    email: member.email,
-    picture: member.picture,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  });
-
-  if (existing?.browser?.status === "active") {
-    return clientRedirect;
-  }
-  return createConnectUrl(userId, clientRedirect);
 }
 
 export function getLinkedInAccess(context: ToolContext): { accessToken: string; personUrn: string } {

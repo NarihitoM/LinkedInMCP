@@ -2,8 +2,8 @@ import type { Response } from "express";
 import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { describe, expect, it } from "vitest";
 import { seal } from "../../shared/lib/seal.ts";
-import { userIdFor } from "../../shared/lib/userStore.ts";
 import { LinkedInOAuthProvider } from "./auth.provider.ts";
+import { userIdFor } from "./auth.service.ts";
 import { AUTHORIZATION_CODE_TTL, type AuthorizationCode } from "./auth.types.ts";
 
 const provider = new LinkedInOAuthProvider();
