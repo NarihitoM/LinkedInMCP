@@ -44,15 +44,21 @@ export function isPrivateAddress(address: string): boolean {
   return blocked.check(address, family === 6 ? "ipv6" : "ipv4");
 }
 
-export async function assertPublicHostname(hostname: string): Promise<void> {
+export async function resolvePublicAddress(hostname: string): Promise<string> {
   const host = hostname.replace(/^\[|\]$/g, "");
   const addresses = isIP(host) ? [{ address: host }] : await lookupAsync(host, { all: true }).catch(() => []);
-  if (addresses.length === 0) {
+  const first = addresses[0];
+  if (!first) {
     throw new PrivateAddressError(`Could not resolve ${host}`);
   }
   if (addresses.some(({ address }) => isPrivateAddress(address))) {
     throw new PrivateAddressError(`${host} resolves to a private network address`);
   }
+  return first.address;
+}
+
+export async function assertPublicHostname(hostname: string): Promise<void> {
+  await resolvePublicAddress(hostname);
 }
 
 export const publicOnlyLookup: LookupFunction = (hostname, options, callback) => {

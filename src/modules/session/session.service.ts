@@ -8,7 +8,7 @@ import { randomToken, seal, unseal } from "../../shared/lib/seal.ts";
 import { runExclusive } from "../../shared/lib/userQueue.ts";
 import { readUser, updateUser, type UserRecord } from "../../shared/lib/userStore.ts";
 import { LoginWallError, ToolError } from "../../shared/utils/errors.ts";
-import { assertPublicHostname } from "../../shared/utils/netGuard.ts";
+import { resolvePublicAddress } from "../../shared/utils/netGuard.ts";
 
 export const CONNECT_TTL = 15 * 60;
 
@@ -65,12 +65,17 @@ export function parseProxy(raw: string): ProxySettings {
 
 export async function checkedProxy(raw: string): Promise<ProxySettings> {
   const proxy = parseProxy(raw);
+  const server = new URL(proxy.server);
+  let address: string;
   try {
-    await assertPublicHostname(new URL(proxy.server).hostname);
+    address = await resolvePublicAddress(server.hostname);
   } catch {
     throw new ToolError("The proxy host must resolve to a public internet address.");
   }
-  return proxy;
+  if (server.protocol === "https:") return proxy;
+
+  const host = address.includes(":") ? `[${address}]` : address;
+  return { ...proxy, server: `${server.protocol}//${host}${server.port ? `:${server.port}` : ""}` };
 }
 
 export async function proxyFor(user: UserRecord | undefined): Promise<ProxySettings | undefined> {

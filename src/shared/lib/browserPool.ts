@@ -61,9 +61,7 @@ function userAgentFor(browser: Browser): string {
 
 async function blockPrivateNetworks(context: BrowserContext): Promise<void> {
   const verdicts = new Map<string, Promise<boolean>>();
-
-  await context.route("**/*", async (route: Route) => {
-    const { hostname } = new URL(route.request().url());
+  const isPublic = (hostname: string): Promise<boolean> => {
     let verdict = verdicts.get(hostname);
     if (!verdict) {
       verdict = assertPublicHostname(hostname).then(
@@ -72,11 +70,26 @@ async function blockPrivateNetworks(context: BrowserContext): Promise<void> {
       );
       verdicts.set(hostname, verdict);
     }
+    return verdict;
+  };
 
-    if (await verdict) {
+  await context.routeWebSocket(
+    () => true,
+    async (socket) => {
+      if (await isPublic(new URL(socket.url()).hostname)) {
+        socket.connectToServer();
+      } else {
+        logger.warn("Blocked browser WebSocket to a private network address", { url: socket.url() });
+        await socket.close().catch(() => undefined);
+      }
+    },
+  );
+
+  await context.route("**/*", async (route: Route) => {
+    if (await isPublic(new URL(route.request().url()).hostname)) {
       await route.continue().catch(() => undefined);
     } else {
-      logger.warn("Blocked browser request to a private network address", { hostname });
+      logger.warn("Blocked browser request to a private network address", { url: route.request().url() });
       await route.abort("blockedbyclient").catch(() => undefined);
     }
   });
@@ -107,6 +120,7 @@ export async function withContext<T>(options: ContextOptions, task: (context: Br
     const browser = await getBrowser();
     const contextOptions: BrowserContextOptions = {
       viewport: VIEWPORT,
+      serviceWorkers: "block",
       userAgent: userAgentFor(browser),
       locale: "en-US",
       ...(options.storageState ? { storageState: options.storageState } : {}),

@@ -5,7 +5,8 @@ import { assertPublicHostname, PrivateAddressError, publicOnlyLookup } from "./n
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_REDIRECTS = 4;
-const TIMEOUT_MS = 20_000;
+const IDLE_TIMEOUT_MS = 20_000;
+const TOTAL_TIMEOUT_MS = 45_000;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif"];
 
 export interface ImageFile {
@@ -23,10 +24,10 @@ function assertImage(mimeType: string, size: number): void {
   }
 }
 
-function get(url: URL): Promise<IncomingMessage> {
+function get(url: URL, signal: AbortSignal): Promise<IncomingMessage> {
   const request = url.protocol === "https:" ? httpsRequest : httpRequest;
   return new Promise((resolve, reject) => {
-    const outgoing = request(url, { method: "GET", lookup: publicOnlyLookup, timeout: TIMEOUT_MS }, resolve);
+    const outgoing = request(url, { method: "GET", lookup: publicOnlyLookup, timeout: IDLE_TIMEOUT_MS, signal }, resolve);
     outgoing.on("timeout", () => outgoing.destroy(new ToolError("Image download timed out.")));
     outgoing.on("error", reject);
     outgoing.end();
@@ -51,7 +52,18 @@ function readCapped(response: IncomingMessage): Promise<Buffer> {
 }
 
 export async function fetchImage(rawUrl: string): Promise<ImageFile> {
-  let url = new URL(rawUrl);
+  try {
+    return await download(new URL(rawUrl), AbortSignal.timeout(TOTAL_TIMEOUT_MS));
+  } catch (error) {
+    if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
+      throw new ToolError("Image download timed out.");
+    }
+    throw error;
+  }
+}
+
+async function download(startUrl: URL, signal: AbortSignal): Promise<ImageFile> {
+  let url = startUrl;
 
   for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
     if (url.protocol !== "https:" && url.protocol !== "http:") {
@@ -61,12 +73,12 @@ export async function fetchImage(rawUrl: string): Promise<ImageFile> {
     let response: IncomingMessage;
     try {
       await assertPublicHostname(url.hostname);
-      response = await get(url);
+      response = await get(url, signal);
     } catch (error) {
       if (error instanceof PrivateAddressError) {
         throw new ToolError("Image URL points to a private network address, which is not allowed.");
       }
-      if (error instanceof ToolError) throw error;
+      if (error instanceof ToolError || signal.aborted) throw error;
       throw new ToolError(`Could not download image: ${error instanceof Error ? error.message : String(error)}`);
     }
 
