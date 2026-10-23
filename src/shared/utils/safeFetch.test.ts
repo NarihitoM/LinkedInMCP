@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ToolError } from "./errors.ts";
-import { decodeImage, fetchImage, isPrivateAddress } from "./safeFetch.ts";
+import { isPrivateAddress } from "./netGuard.ts";
+import { decodeImage, fetchImage } from "./safeFetch.ts";
 
 describe("safeFetch", () => {
   it("flags private and loopback addresses", () => {
-    for (const address of ["127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.169.254", "0.0.0.0", "::1", "fd00::1", "::ffff:127.0.0.1"]) {
+    for (const address of ["127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.169.254", "0.0.0.0", "::1", "fd00::1", "::ffff:127.0.0.1", "::ffff:7f00:1", "64:ff9b::a00:1", "100.64.0.1", "not-an-ip"]) {
       expect(isPrivateAddress(address), address).toBe(true);
     }
   });

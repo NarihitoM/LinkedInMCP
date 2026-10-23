@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getEnv } from "../../shared/lib/env.ts";
+import { getEnv } from "./env.ts";
 
 const AUTHORIZATION_URL = "https://www.linkedin.com/oauth/v2/authorization";
 const TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken";

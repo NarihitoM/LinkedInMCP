@@ -3,7 +3,7 @@ import { readUser, saveUser, userIdFor, type UserRecord } from "../../shared/lib
 import { ToolError } from "../../shared/utils/errors.ts";
 import { createConnectUrl } from "../session/index.ts";
 import { AUTHORIZATION_CODE_TTL, type AuthorizationCode, type PendingAuthorization } from "./auth.types.ts";
-import { exchangeCode, fetchUserInfo } from "./linkedinOidc.ts";
+import { exchangeCode, fetchUserInfo } from "../../shared/lib/linkedinOidc.ts";
 
 export function redirectWith(target: string, params: Record<string, string | undefined>): string {
   const url = new URL(target);

@@ -36,6 +36,13 @@ There is no database. OAuth clients, authorization codes and access/refresh toke
 
 Changing `SESSION_ENCRYPTION_KEY` makes every stored file and every issued token unreadable, so all users have to sign in again.
 
+## Security
+
+- Connect links are single-use, expire after 15 minutes, and are sealed to one user.
+- After the remote login, the server runs LinkedIn's OAuth flow inside that browser and checks that the LinkedIn member matches the account that signed in to the MCP server. A session for any other account is rejected, so a connect link cannot be used to capture someone else's LinkedIn account.
+- Server-side browsers, image downloads and user proxies can't reach private, loopback or link-local addresses. Image downloads are checked again at connect time and capped at 10 MB.
+- The login page sends a strict nonce-based Content Security Policy and accepts WebSocket connections only from `BASE_URL`'s origin.
+
 ## Setup
 
 ### 1. Create a LinkedIn app

@@ -6,7 +6,7 @@ import { renderMessagePage, sendPage } from "../../shared/utils/html.ts";
 import { AUTHORIZE_COOKIE } from "./auth.provider.ts";
 import { completeAuthorization, redirectWith } from "./auth.service.ts";
 import { pendingAuthorizationSchema } from "./auth.types.ts";
-import { CALLBACK_PATH } from "./linkedinOidc.ts";
+import { CALLBACK_PATH } from "../../shared/lib/linkedinOidc.ts";
 
 export const authRouter = Router();
 

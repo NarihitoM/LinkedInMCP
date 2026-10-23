@@ -8,6 +8,7 @@ import { randomToken, seal, unseal } from "../../shared/lib/seal.ts";
 import { runExclusive } from "../../shared/lib/userQueue.ts";
 import { readUser, updateUser, type UserRecord } from "../../shared/lib/userStore.ts";
 import { LoginWallError, ToolError } from "../../shared/utils/errors.ts";
+import { assertPublicHostname } from "../../shared/utils/netGuard.ts";
 
 export const CONNECT_TTL = 15 * 60;
 
@@ -62,8 +63,18 @@ export function parseProxy(raw: string): ProxySettings {
   };
 }
 
-export function proxyFor(user: UserRecord | undefined): ProxySettings | undefined {
-  return user?.proxyUrl ? parseProxy(user.proxyUrl) : undefined;
+export async function checkedProxy(raw: string): Promise<ProxySettings> {
+  const proxy = parseProxy(raw);
+  try {
+    await assertPublicHostname(new URL(proxy.server).hostname);
+  } catch {
+    throw new ToolError("The proxy host must resolve to a public internet address.");
+  }
+  return proxy;
+}
+
+export async function proxyFor(user: UserRecord | undefined): Promise<ProxySettings | undefined> {
+  return user?.proxyUrl ? checkedProxy(user.proxyUrl) : undefined;
 }
 
 export function hasAuthCookie(state: StorageState, now = Date.now()): boolean {
@@ -105,8 +116,9 @@ export async function withLinkedIn<T>(userId: string, task: (session: LinkedInSe
       throw await sessionRequired(userId, "The LinkedIn browser session expired.");
     }
 
+    const proxy = await proxyFor(user);
     try {
-      return await withContext({ storageState: browser.storageState, proxy: proxyFor(user) }, async (context) => {
+      return await withContext({ storageState: browser.storageState, proxy }, async (context) => {
         const page = await context.newPage();
         page.setDefaultTimeout(15_000);
         try {
@@ -148,6 +160,6 @@ export async function disconnectBrowserSession(userId: string): Promise<void> {
 }
 
 export async function setProxy(userId: string, proxyUrl: string | undefined): Promise<void> {
-  if (proxyUrl) parseProxy(proxyUrl);
+  if (proxyUrl) await checkedProxy(proxyUrl);
   await updateUser(userId, (user) => ({ ...user, proxyUrl }));
 }

@@ -5,9 +5,11 @@ import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import { z } from "zod";
 import { VIEWPORT, withContext } from "../../shared/lib/browserPool.ts";
 import { getEnv } from "../../shared/lib/env.ts";
+import { buildAuthorizationUrl, callbackUrl, exchangeCode, fetchUserInfo, type LinkedInAccessToken } from "../../shared/lib/linkedinOidc.ts";
 import { logger } from "../../shared/lib/logger.ts";
 import { isLoginWall, LINKEDIN_URL } from "../../shared/lib/pageActions.ts";
-import { readUser } from "../../shared/lib/userStore.ts";
+import { randomToken } from "../../shared/lib/seal.ts";
+import { readUser, updateUser } from "../../shared/lib/userStore.ts";
 import { consumeConnectToken, hasAuthCookie, proxyFor, saveBrowserSession, type ConnectGrant } from "./session.service.ts";
 
 export const SOCKET_PATH = "/session/ws";
@@ -15,6 +17,7 @@ export const SOCKET_PATH = "/session/ws";
 const LOGIN_TIMEOUT_MS = 10 * 60 * 1000;
 const HELLO_TIMEOUT_MS = 10_000;
 const POLL_MS = 1_500;
+const VERIFY_TIMEOUT_MS = 2 * 60 * 1000;
 
 const NAMED_KEYS = [
   "Enter",
@@ -108,6 +111,32 @@ async function resolvePublicIdentifier(page: Page): Promise<string> {
   return decodeURIComponent(match[1]);
 }
 
+type Verification = { token: LinkedInAccessToken } | { error: string };
+
+const UNCONFIRMED = "Could not confirm your LinkedIn account. Ask Claude for a new link and try again.";
+const WRONG_ACCOUNT = "This is not the LinkedIn account you connected in Claude. Ask Claude for a new link and log in with the same account.";
+
+async function verifyMember(page: Page, expectedSub: string): Promise<Verification> {
+  const state = randomToken();
+  const callback = callbackUrl();
+  const isCallback = (url: string) => url.startsWith(callback);
+
+  await page.route((url) => isCallback(url.href), (route) => route.fulfill({ status: 204, body: "" }));
+  const captured = page.waitForRequest((request) => isCallback(request.url()), { timeout: VERIFY_TIMEOUT_MS });
+  await page.goto(buildAuthorizationUrl(state), { waitUntil: "commit", timeout: 30_000 }).catch(() => undefined);
+
+  const request = await captured.catch(() => undefined);
+  if (!request) return { error: UNCONFIRMED };
+
+  const params = new URL(request.url()).searchParams;
+  const code = params.get("code");
+  if (params.get("state") !== state || !code) return { error: UNCONFIRMED };
+
+  const token = await exchangeCode(code);
+  const info = await fetchUserInfo(token.accessToken);
+  return info.sub === expectedSub ? { token } : { error: WRONG_ACCOUNT };
+}
+
 function waitForLogin(context: BrowserContext, page: Page, socket: WebSocket): Promise<"done" | "closed" | "timeout"> {
   return new Promise((resolve) => {
     let settled = false;
@@ -138,7 +167,7 @@ async function runLogin(socket: WebSocket, grant: ConnectGrant): Promise<void> {
   const user = await readUser(grant.userId);
   send(socket, { type: "status", message: "Starting a secure browser..." });
 
-  await withContext({ proxy: proxyFor(user) }, async (context) => {
+  await withContext({ proxy: await proxyFor(user) }, async (context) => {
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
 
@@ -169,7 +198,6 @@ async function runLogin(socket: WebSocket, grant: ConnectGrant): Promise<void> {
     send(socket, { type: "status", message: "Log in to LinkedIn below. Your password goes straight to LinkedIn." });
 
     const outcome = await waitForLogin(context, page, socket);
-    await cdp.send("Page.stopScreencast").catch(() => undefined);
 
     if (outcome === "timeout") {
       send(socket, { type: "error", message: "Login timed out. Ask Claude for a new connect link." });
@@ -177,7 +205,16 @@ async function runLogin(socket: WebSocket, grant: ConnectGrant): Promise<void> {
     }
     if (outcome === "closed") return;
 
-    send(socket, { type: "status", message: "Logged in. Saving your session..." });
+    send(socket, { type: "status", message: "Logged in. Confirming the account. If LinkedIn asks, click Allow." });
+    const verification: Verification = user ? await verifyMember(page, user.sub) : { error: UNCONFIRMED };
+    await cdp.send("Page.stopScreencast").catch(() => undefined);
+    if ("error" in verification) {
+      send(socket, { type: "error", message: verification.error });
+      return;
+    }
+
+    send(socket, { type: "status", message: "Verified. Saving your session..." });
+    await updateUser(grant.userId, (current) => ({ ...current, linkedin: verification.token }));
     const publicIdentifier = await resolvePublicIdentifier(page);
     await saveBrowserSession(grant.userId, await context.storageState(), publicIdentifier);
     send(socket, { type: "done", next: grant.next ?? null });

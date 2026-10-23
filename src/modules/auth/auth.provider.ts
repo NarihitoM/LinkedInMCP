@@ -22,7 +22,7 @@ import {
   type Grant,
   type PendingAuthorization,
 } from "./auth.types.ts";
-import { buildAuthorizationUrl, CALLBACK_PATH } from "./linkedinOidc.ts";
+import { buildAuthorizationUrl, CALLBACK_PATH } from "../../shared/lib/linkedinOidc.ts";
 
 export const AUTHORIZE_COOKIE = "li_authorize";
 

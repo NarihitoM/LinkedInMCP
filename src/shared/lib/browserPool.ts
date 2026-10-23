@@ -1,4 +1,5 @@
-import { chromium, type Browser, type BrowserContext, type BrowserContextOptions } from "playwright";
+import { chromium, type Browser, type BrowserContext, type BrowserContextOptions, type Route } from "playwright";
+import { assertPublicHostname } from "../utils/netGuard.ts";
 import { getEnv } from "./env.ts";
 import { logger } from "./logger.ts";
 
@@ -58,6 +59,29 @@ function userAgentFor(browser: Browser): string {
   return `Mozilla/5.0 (${platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`;
 }
 
+async function blockPrivateNetworks(context: BrowserContext): Promise<void> {
+  const verdicts = new Map<string, Promise<boolean>>();
+
+  await context.route("**/*", async (route: Route) => {
+    const { hostname } = new URL(route.request().url());
+    let verdict = verdicts.get(hostname);
+    if (!verdict) {
+      verdict = assertPublicHostname(hostname).then(
+        () => true,
+        () => false,
+      );
+      verdicts.set(hostname, verdict);
+    }
+
+    if (await verdict) {
+      await route.continue().catch(() => undefined);
+    } else {
+      logger.warn("Blocked browser request to a private network address", { hostname });
+      await route.abort("blockedbyclient").catch(() => undefined);
+    }
+  });
+}
+
 async function acquireSlot(): Promise<void> {
   if (activeContexts < getEnv().MAX_BROWSERS) {
     activeContexts += 1;
@@ -89,6 +113,7 @@ export async function withContext<T>(options: ContextOptions, task: (context: Br
       ...(options.proxy ? { proxy: options.proxy } : {}),
     };
     context = await browser.newContext(contextOptions);
+    await blockPrivateNetworks(context);
     return await task(context);
   } finally {
     if (context) {
