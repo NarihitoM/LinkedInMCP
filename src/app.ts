@@ -15,7 +15,9 @@ function createApp(env: Env): Express {
 
   const app = express();
   app.disable("x-powered-by");
-  app.set("trust proxy", true);
+  if (process.env.VERCEL) {
+    app.set("trust proxy", 1);
+  }
 
   app.use(
     mcpAuthRouter({
