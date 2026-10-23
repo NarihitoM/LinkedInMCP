@@ -53,8 +53,8 @@ export function peekConnectToken(token: string): ConnectGrant | undefined {
 
 export function parseProxy(raw: string): ProxySettings {
   const url = new URL(raw);
-  if (!["http:", "https:", "socks5:"].includes(url.protocol)) {
-    throw new ToolError("Proxy URL must start with http://, https:// or socks5://");
+  if (!["http:", "socks5:"].includes(url.protocol)) {
+    throw new ToolError("Proxy URL must start with http:// or socks5://");
   }
   return {
     server: `${url.protocol}//${url.host}`,
@@ -72,8 +72,6 @@ export async function checkedProxy(raw: string): Promise<ProxySettings> {
   } catch {
     throw new ToolError("The proxy host must resolve to a public internet address.");
   }
-  if (server.protocol === "https:") return proxy;
-
   const host = address.includes(":") ? `[${address}]` : address;
   return { ...proxy, server: `${server.protocol}//${host}${server.port ? `:${server.port}` : ""}` };
 }

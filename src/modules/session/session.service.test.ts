@@ -25,7 +25,6 @@ beforeAll(async () => {
     id: userId,
     sub: "member-session",
     name: "Session Test",
-    linkedin: { accessToken: "token", scopes: ["openid"], expiresAt: Date.now() + 60_000 },
     createdAt: Date.now(),
     updatedAt: Date.now(),
   });

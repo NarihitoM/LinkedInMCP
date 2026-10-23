@@ -1,15 +1,10 @@
-import { rm } from "node:fs/promises";
-import { join } from "node:path";
 import type { Response } from "express";
 import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/shared/auth.js";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { seal } from "../../shared/lib/seal.ts";
-import { saveUser, userIdFor } from "../../shared/lib/userStore.ts";
+import { userIdFor } from "../../shared/lib/userStore.ts";
 import { LinkedInOAuthProvider } from "./auth.provider.ts";
 import { AUTHORIZATION_CODE_TTL, type AuthorizationCode } from "./auth.types.ts";
-
-const DATA_DIR = join("data-test", "auth-provider");
-process.env.DATA_DIR = DATA_DIR;
 
 const provider = new LinkedInOAuthProvider();
 const userId = userIdFor("member-auth");
@@ -28,28 +23,15 @@ function issueCode(client: OAuthClientInformationFull, overrides: Partial<Author
   const code: AuthorizationCode = {
     clientId: client.client_id,
     userId,
+    scopes: ["linkedin"],
+    member: { sub: "member-auth", name: "Auth Test", email: "auth@example.com" },
+    linkedin: { accessToken: "linkedin-token", scopes: ["openid", "w_member_social"], expiresAt: Date.now() + 60_000 },
     codeChallenge: "challenge",
     redirectUri: "http://localhost:5555/callback",
-    scopes: ["linkedin"],
     ...overrides,
   };
   return seal("code", code, AUTHORIZATION_CODE_TTL);
 }
-
-beforeAll(async () => {
-  await saveUser({
-    id: userId,
-    sub: "member-auth",
-    name: "Auth Test",
-    linkedin: { accessToken: "token", scopes: ["openid"], expiresAt: Date.now() + 60_000 },
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  });
-});
-
-afterAll(async () => {
-  await rm(DATA_DIR, { recursive: true, force: true });
-});
 
 describe("LinkedInOAuthProvider", () => {
   it("registers public clients with a sealed client id", async () => {
@@ -94,7 +76,7 @@ describe("LinkedInOAuthProvider", () => {
     expect(headers["Set-Cookie"]).toMatch(/^li_authorize=.+HttpOnly; SameSite=Lax$/);
   });
 
-  it("exchanges a code for tokens and verifies the access token", async () => {
+  it("exchanges a code for tokens that carry the member and LinkedIn token", async () => {
     const client = await registerClient();
     const code = issueCode(client);
 
@@ -104,6 +86,11 @@ describe("LinkedInOAuthProvider", () => {
 
     const info = await provider.verifyAccessToken(tokens.access_token);
     expect(info.extra?.userId).toBe(userId);
+    expect(info.extra?.grant).toMatchObject({
+      member: { sub: "member-auth", name: "Auth Test" },
+      linkedin: { accessToken: "linkedin-token" },
+    });
+    expect(info.extra?.grant).not.toHaveProperty("codeChallenge");
     expect(info.scopes).toEqual(["linkedin"]);
   });
 
@@ -126,9 +113,13 @@ describe("LinkedInOAuthProvider", () => {
     await expect(provider.exchangeRefreshToken(client, tokens.access_token)).rejects.toThrow();
   });
 
-  it("rejects tokens for users that no longer exist", async () => {
+  it("rejects tokens once the LinkedIn sign-in has expired", async () => {
     const client = await registerClient();
-    const tokens = await provider.exchangeAuthorizationCode(client, issueCode(client, { userId: userIdFor("ghost") }));
-    await expect(provider.verifyAccessToken(tokens.access_token)).rejects.toThrow();
+    const expired = { accessToken: "old", scopes: ["openid"], expiresAt: Date.now() - 1 };
+    const tokens = await provider.exchangeAuthorizationCode(client, issueCode(client, { linkedin: expired }));
+    if (!tokens.refresh_token) throw new Error("missing refresh token");
+
+    await expect(provider.verifyAccessToken(tokens.access_token)).rejects.toThrow("expired");
+    await expect(provider.exchangeRefreshToken(client, tokens.refresh_token)).rejects.toThrow("expired");
   });
 });

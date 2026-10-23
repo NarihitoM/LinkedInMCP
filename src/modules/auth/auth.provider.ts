@@ -10,7 +10,6 @@ import {
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { getEnv } from "../../shared/lib/env.ts";
 import { randomToken, seal, unseal } from "../../shared/lib/seal.ts";
-import { readUser } from "../../shared/lib/userStore.ts";
 import { serializeCookie } from "../../shared/utils/cookies.ts";
 import {
   ACCESS_TOKEN_TTL,
@@ -51,9 +50,8 @@ function issueTokens(grant: Grant): OAuthTokens {
   };
 }
 
-async function hasUsableAccount(userId: string): Promise<boolean> {
-  const user = await readUser(userId);
-  return Boolean(user && user.linkedin.expiresAt > Date.now());
+function linkedInExpired(grant: Grant): boolean {
+  return grant.linkedin.expiresAt <= Date.now();
 }
 
 function openCode(client: OAuthClientInformationFull, code: string) {
@@ -103,11 +101,11 @@ export class LinkedInOAuthProvider implements OAuthServerProvider {
     _codeVerifier?: string,
     redirectUri?: string,
   ): Promise<OAuthTokens> {
-    const code = openCode(client, authorizationCode);
-    if (redirectUri && redirectUri !== code.redirectUri) {
+    const { codeChallenge: _challenge, redirectUri: expectedRedirect, ...grant } = openCode(client, authorizationCode);
+    if (redirectUri && redirectUri !== expectedRedirect) {
       throw new InvalidGrantError("redirect_uri does not match the authorization request");
     }
-    return issueTokens({ clientId: code.clientId, userId: code.userId, scopes: code.scopes, resource: code.resource });
+    return issueTokens(grant);
   }
 
   async exchangeRefreshToken(client: OAuthClientInformationFull, refreshToken: string, scopes?: string[]): Promise<OAuthTokens> {
@@ -115,8 +113,8 @@ export class LinkedInOAuthProvider implements OAuthServerProvider {
     if (!opened || opened.data.clientId !== client.client_id) {
       throw new InvalidGrantError("Invalid or expired refresh token");
     }
-    if (!(await hasUsableAccount(opened.data.userId))) {
-      throw new InvalidGrantError("LinkedIn sign-in expired or was disconnected. Sign in again.");
+    if (linkedInExpired(opened.data)) {
+      throw new InvalidGrantError("LinkedIn sign-in expired. Sign in again.");
     }
     const granted = opened.data.scopes;
     const requested = scopes?.length ? scopes.filter((scope) => granted.includes(scope)) : granted;
@@ -128,8 +126,8 @@ export class LinkedInOAuthProvider implements OAuthServerProvider {
     if (!opened) {
       throw new InvalidTokenError("Invalid or expired access token");
     }
-    if (!(await hasUsableAccount(opened.data.userId))) {
-      throw new InvalidTokenError("LinkedIn sign-in expired or was disconnected. Sign in again.");
+    if (linkedInExpired(opened.data)) {
+      throw new InvalidTokenError("LinkedIn sign-in expired. Sign in again.");
     }
     return {
       token,
@@ -137,7 +135,7 @@ export class LinkedInOAuthProvider implements OAuthServerProvider {
       scopes: opened.data.scopes,
       expiresAt: opened.expiresAt,
       ...(opened.data.resource ? { resource: new URL(opened.data.resource) } : {}),
-      extra: { userId: opened.data.userId },
+      extra: { userId: opened.data.userId, grant: opened.data },
     };
   }
 }

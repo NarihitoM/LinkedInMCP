@@ -8,7 +8,7 @@ import { commentOnPost, getPostStats, listMyPosts, publishPost, reactToPost, rem
 const postId = z.string().min(1).describe("Post URN (urn:li:share:..., urn:li:ugcPost:..., urn:li:activity:...) or post URL");
 const reactionNames = Object.keys(REACTIONS) as [Reaction, ...Reaction[]];
 
-export function registerPostsTools(server: McpServer, context: ToolContext): void {
+export function registerPostsTools(server: McpServer, context: ToolContext, options: { browser: boolean }): void {
   defineTool(server, {
     name: "create_post",
     title: "Create post",
@@ -26,7 +26,7 @@ export function registerPostsTools(server: McpServer, context: ToolContext): voi
       articleTitle: z.string().max(400).optional(),
       articleDescription: z.string().max(4086).optional(),
     },
-    handler: (args) => publishPost(context.userId, args),
+    handler: (args) => publishPost(context, args),
   });
 
   defineTool(server, {
@@ -36,10 +36,12 @@ export function registerPostsTools(server: McpServer, context: ToolContext): voi
     kind: "destructive",
     input: { post: postId },
     handler: async ({ post }) => {
-      await removePost(context.userId, post);
+      await removePost(context, post);
       return "Post deleted.";
     },
   });
+
+  if (!options.browser) return;
 
   defineTool(server, {
     name: "list_my_posts",

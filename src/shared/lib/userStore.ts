@@ -32,11 +32,6 @@ const userSchema = z.object({
   name: z.string(),
   email: z.string().optional(),
   picture: z.string().optional(),
-  linkedin: z.object({
-    accessToken: z.string(),
-    scopes: z.array(z.string()),
-    expiresAt: z.number(),
-  }),
   browser: z
     .object({
       storageState: storageStateSchema,

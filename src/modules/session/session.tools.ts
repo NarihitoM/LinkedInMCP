@@ -41,7 +41,7 @@ export function registerSessionTools(server: McpServer, context: ToolContext): v
     name: "set_browser_proxy",
     title: "Set browser proxy",
     description:
-      "Route this user's LinkedIn browser through a proxy (http://, https:// or socks5://, credentials allowed). Pass nothing to remove it. Reconnect the session after changing it.",
+      "Route this user's LinkedIn browser through a proxy (http:// or socks5://, credentials allowed). Pass nothing to remove it. Reconnect the session after changing it.",
     kind: "write",
     input: {
       proxyUrl: z.url().optional().describe("Proxy URL, for example http://user:pass@host:port. Omit to clear."),

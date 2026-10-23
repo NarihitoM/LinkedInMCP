@@ -32,6 +32,7 @@ export function getEnv(): Env {
   if (cached) return cached;
 
   const present = Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== ""));
+  present.BASE_URL ??= process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined;
   const result = envSchema.safeParse(present);
   if (!result.success) {
     const issues = result.error.issues.map((issue) => `  ${issue.path.join(".")}: ${issue.message}`).join("\n");
@@ -40,4 +41,8 @@ export function getEnv(): Env {
 
   cached = result.data;
   return cached;
+}
+
+export function browserToolsEnabled(): boolean {
+  return !process.env.VERCEL;
 }

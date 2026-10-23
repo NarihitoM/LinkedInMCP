@@ -1,6 +1,7 @@
 import type { Page } from "playwright";
 import { cleanLines } from "../../shared/lib/pageExtract.ts";
 import { click, fill, find, findVisible, open, pause, scrollToBottom } from "../../shared/lib/pageActions.ts";
+import type { ToolContext } from "../../shared/types/tool.ts";
 import { ToolError } from "../../shared/utils/errors.ts";
 import { toCommentary } from "../../shared/utils/littleText.ts";
 import { loadImage } from "../../shared/utils/safeFetch.ts";
@@ -33,8 +34,8 @@ export function postUrl(urn: string): string {
   return `https://www.linkedin.com/feed/update/${urn}/`;
 }
 
-export async function publishPost(userId: string, post: NewPost) {
-  const { accessToken, personUrn } = await getLinkedInAccess(userId);
+export async function publishPost(context: ToolContext, post: NewPost) {
+  const { accessToken, personUrn } = getLinkedInAccess(context);
   const hasImage = Boolean(post.imageUrl || post.imageBase64);
 
   if (hasImage && post.articleUrl) {
@@ -60,9 +61,9 @@ export async function publishPost(userId: string, post: NewPost) {
   return { urn, url: postUrl(urn) };
 }
 
-export async function removePost(userId: string, urn: string): Promise<void> {
+export async function removePost(context: ToolContext, urn: string): Promise<void> {
   const postUrn = normalizePostUrn(urn);
-  const { accessToken } = await getLinkedInAccess(userId);
+  const { accessToken } = getLinkedInAccess(context);
   await deletePost(accessToken, postUrn);
 }
 

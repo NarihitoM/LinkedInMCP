@@ -5,11 +5,11 @@ import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import { z } from "zod";
 import { VIEWPORT, withContext } from "../../shared/lib/browserPool.ts";
 import { getEnv } from "../../shared/lib/env.ts";
-import { buildAuthorizationUrl, callbackUrl, exchangeCode, fetchUserInfo, type LinkedInAccessToken } from "../../shared/lib/linkedinOidc.ts";
+import { buildAuthorizationUrl, callbackUrl, exchangeCode, fetchUserInfo } from "../../shared/lib/linkedinOidc.ts";
 import { logger } from "../../shared/lib/logger.ts";
 import { isLoginWall, LINKEDIN_URL } from "../../shared/lib/pageActions.ts";
 import { randomToken } from "../../shared/lib/seal.ts";
-import { readUser, updateUser } from "../../shared/lib/userStore.ts";
+import { readUser } from "../../shared/lib/userStore.ts";
 import { consumeConnectToken, hasAuthCookie, proxyFor, saveBrowserSession, type ConnectGrant } from "./session.service.ts";
 
 export const SOCKET_PATH = "/session/ws";
@@ -111,7 +111,7 @@ async function resolvePublicIdentifier(page: Page): Promise<string> {
   return decodeURIComponent(match[1]);
 }
 
-type Verification = { token: LinkedInAccessToken } | { error: string };
+type Verification = { verified: true } | { error: string };
 
 const UNCONFIRMED = "Could not confirm your LinkedIn account. Ask Claude for a new link and try again.";
 const WRONG_ACCOUNT = "This is not the LinkedIn account you connected in Claude. Ask Claude for a new link and log in with the same account.";
@@ -134,7 +134,7 @@ async function verifyMember(page: Page, expectedSub: string): Promise<Verificati
 
   const token = await exchangeCode(code);
   const info = await fetchUserInfo(token.accessToken);
-  return info.sub === expectedSub ? { token } : { error: WRONG_ACCOUNT };
+  return info.sub === expectedSub ? { verified: true } : { error: WRONG_ACCOUNT };
 }
 
 function waitForLogin(context: BrowserContext, page: Page, socket: WebSocket): Promise<"done" | "closed" | "timeout"> {
@@ -214,7 +214,6 @@ async function runLogin(socket: WebSocket, grant: ConnectGrant): Promise<void> {
     }
 
     send(socket, { type: "status", message: "Verified. Saving your session..." });
-    await updateUser(grant.userId, (current) => ({ ...current, linkedin: verification.token }));
     const publicIdentifier = await resolvePublicIdentifier(page);
     await saveBrowserSession(grant.userId, await context.storageState(), publicIdentifier);
     send(socket, { type: "done", next: grant.next ?? null });

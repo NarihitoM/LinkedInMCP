@@ -11,7 +11,7 @@ function makeUser(sub: string): UserRecord {
     id: userIdFor(sub),
     sub,
     name: "Test User",
-    linkedin: { accessToken: "secret-linkedin-token", scopes: ["openid"], expiresAt: Date.now() + 60_000 },
+    email: "secret-email@example.com",
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -27,11 +27,11 @@ describe("userStore", () => {
     await saveUser(user);
 
     const raw = await readFile(join(DATA_DIR, "users", `${user.id}.json`), "utf8");
-    expect(raw).not.toContain("secret-linkedin-token");
+    expect(raw).not.toContain("secret-email@example.com");
     expect(raw).not.toContain("Test User");
 
     const loaded = await readUser(user.id);
-    expect(loaded?.linkedin.accessToken).toBe("secret-linkedin-token");
+    expect(loaded?.email).toBe("secret-email@example.com");
   });
 
   it("serializes concurrent updates", async () => {
