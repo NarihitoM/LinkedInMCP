@@ -19,7 +19,11 @@ const envSchema = z.object({
   LINKEDIN_API_VERSION: z.string().regex(/^\d{6}$/, "must look like YYYYMM").default("202609"),
   SESSION_ENCRYPTION_KEY: z
     .string("is required")
-    .refine((value) => decodeKey(value) !== undefined, "must be 32 random bytes as 64 hex characters"),
+    .transform((value) => value.trim().replace(/^(["'])(.*)\1$/, "$2").trim())
+    .refine(
+      (value) => decodeKey(value) !== undefined,
+      "must be 64 hex characters. Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
+    ),
   DATA_DIR: z.string().default("data"),
   MAX_BROWSERS: positiveInt(3),
 });
